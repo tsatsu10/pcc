@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 const bodySchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  name: z.string().optional(),
+  name: z.string().min(1, "Name is required").trim(),
   timezone: z.string().optional(), // FR-24: Capture user timezone
 });
 
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       data: { 
         email, 
         passwordHash, 
-        name: name ?? null,
+        name,
         timezone: timezone ?? 'UTC', // Default to UTC if not provided
       },
       select: { id: true, email: true, name: true, timezone: true, createdAt: true },

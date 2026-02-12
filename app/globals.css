@@ -74,9 +74,20 @@
   }
 }
 
+/* Placeholder contrast: darker theme needs lighter placeholder for readability (WCAG) */
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: hsl(215 18% 72%);
+}
+
 @layer base {
   * {
     @apply border-border;
+  }
+  /* Visible focus for keyboard users (don't rely on outline alone) */
+  a:focus-visible,
+  button:focus-visible {
+    outline: none;
   }
   body {
     @apply bg-background text-foreground;
@@ -218,6 +229,60 @@
 
 @media (prefers-reduced-motion: reduce) {
   .success-checkmark-inner {
+    animation: none;
+  }
+}
+
+/* Auth panel: subtle motion background */
+@keyframes auth-gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes auth-float-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.25;
+  }
+  33% {
+    transform: translate(8%, -12%) scale(1.05);
+    opacity: 0.35;
+  }
+  66% {
+    transform: translate(-5%, 8%) scale(0.95);
+    opacity: 0.2;
+  }
+}
+
+@keyframes auth-float-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate(-10%, -8%) scale(1.1);
+    opacity: 0.3;
+  }
+}
+
+.auth-panel-motion {
+  background-size: 200% 200%;
+  animation: auth-gradient 18s ease infinite;
+}
+
+.auth-orb {
+  animation-duration: 20s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-panel-motion,
+  .auth-orb {
     animation: none;
   }
 }
