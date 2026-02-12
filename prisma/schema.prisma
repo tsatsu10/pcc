@@ -1,0 +1,209 @@
+// PCC — Personal Command Center
+// Data model per PCC_Cursor_Build_Spec.txt
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  passwordHash          String    @map("password_hash")
+  name                  String?
+  timezone              String    @default("UTC") // FR-24: User timezone for focus date calculations
+  goals                 Json?     // top 3 goals (string array) from onboarding
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  domains       Domain[]
+  projects      Project[]
+  tasks         Task[]
+  focusSessions FocusSession[]
+  reviews        Review[]
+  notes          Note[]
+  tags           Tag[]
+  insightCaches  InsightCache[]
+}
+
+model Domain {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  objective String?
+  kpis      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects Project[]
+  notes    Note[]
+}
+
+model Project {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  domainId  String    @map("domain_id")
+  name      String
+  goal      String?
+  deadline  DateTime? @db.Date
+  priority  Int       @default(2) // 1=low, 2=med, 3=high
+  status    ProjectStatus @default(active)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain  Domain  @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+  notes   Note[]
+
+  @@index([userId, domainId])
+}
+
+enum ProjectStatus {
+  active
+  paused
+  completed
+  dropped   // abandoned / killed — for strategic pruning and historical learning
+}
+
+model Task {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  projectId         String    @map("project_id")
+  title             String
+  deadline          DateTime? @db.Date
+  effort            String    @default("m") // "xs"/"s"/"m"/"l"/"xl" OR "90min"/"2h" (flexible format per FR-16)
+  energyLevel       EnergyLevel @map("energy_level") @default(medium)
+  status            TaskStatus  @default(backlog)
+  focusDate         DateTime? @db.Date @map("focus_date")
+  focusGoalMinutes  Int?      @map("focus_goal_minutes") // optional planned duration when in focus (1-240)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  focusSessions FocusSession[]
+  notes         Note[]
+
+  @@index([userId, status])
+  @@index([userId, focusDate])
+}
+
+enum TaskStatus {
+  backlog    // Task in queue, ready to be assigned to focus
+  focus      // Task actively in today's focus (max 3 per day)
+  done       // Task completed
+  postponed  // Task moved back to backlog
+  // Note: "pending" removed - use "backlog" for all queued tasks
+}
+
+// Removed TaskEffort enum - now using flexible String field per FR-16
+
+enum EnergyLevel {
+  low
+  medium
+  high
+}
+
+model FocusSession {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  taskId          String    @map("task_id")
+  startTime       DateTime  @map("start_time")
+  endTime         DateTime? @map("end_time")
+  durationMinutes Int?      @map("duration_minutes")
+  pausedAt        DateTime? @map("paused_at")   // when session was paused (null = running)
+  totalPausedMs   Int       @default(0) @map("total_paused_ms")
+  notes           String?   @db.Text             // optional per-session notes (Build Spec §7.6)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startTime])
+}
+
+model Review {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  type      ReviewType
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+  content   Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ReviewType {
+  daily
+  weekly
+  monthly
+}
+
+model InsightCache {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  periodEnd DateTime @db.Date @map("period_end")
+  insight   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodEnd])
+  @@index([userId])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String
+  content   String   @db.Text
+  domainId  String?  @map("domain_id")
+  projectId String?  @map("project_id")
+  taskId    String?  @map("task_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain  Domain?  @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  tags    NoteTag[]
+
+  @@index([userId])
+  @@index([domainId])
+  @@index([projectId])
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes NoteTag[]
+
+  @@index([userId])
+  @@unique([userId, name])
+}
+
+model NoteTag {
+  noteId String @map("note_id")
+  tagId  String @map("tag_id")
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([noteId])
+  @@index([tagId])
+}

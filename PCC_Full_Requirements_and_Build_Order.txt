@@ -1,0 +1,376 @@
+PERSONAL COMMAND CENTER (PCC)
+FULL REQUIREMENTS DOCUMENT + BUILD ORDER
+Version: 1.2
+Date: 2026-02-06
+Owner: Tsatsu
+
+Revision History:
+- 1.1 (2026-02-02): Initial full requirements + build order.
+- 1.2 (2026-02-06): Clarified FR-16 (effort/energy), review behaviour, postpone rules,
+  NFRs, onboarding defaults, domain/project lifecycle, traceability, glossary,
+  assumptions, auth choice, Phase 3/7 updates, API strategy.
+
+=====================================================================
+SECTION 1 — PROJECT OVERVIEW
+=====================================================================
+
+Project Name:
+Personal Command Center (PCC)
+
+Product Type:
+Web-based SaaS (MVP-first, platform-ready)
+
+Core Idea:
+PCC is a personal operating system that externalizes thinking, planning,
+execution, and review into one enforced system with strict cognitive limits.
+
+Primary Differentiator:
+Hard-enforced Daily Focus Engine (maximum 3 active tasks per day),
+combined with mandatory review loops.
+
+=====================================================================
+SECTION 2 — GOALS & NON-GOALS
+=====================================================================
+
+2.1 Goals
+- Reduce cognitive overload
+- Force execution over planning
+- Provide clear daily priorities
+- Convert activity into insight via reviews
+- Act as a foundation for future vertical SaaS products
+
+2.2 Non-Goals (MVP)
+- No AI dependency
+- No mobile application
+- No collaboration/multi-user teams
+- No advanced forecasting or automation
+
+=====================================================================
+SECTION 3 — USERS & PERSONAS
+=====================================================================
+
+Primary Users:
+- Consultants
+- Managers
+- Founders
+- Doctors / Researchers
+- SME operators (Africa-first focus)
+
+User Characteristics:
+- High mental load
+- Multiple concurrent responsibilities
+- Needs clarity more than features
+- Time-constrained, execution-focused
+
+=====================================================================
+SECTION 4 — FUNCTIONAL REQUIREMENTS
+=====================================================================
+
+---------------------------------------------------------------------
+4.1 Authentication & User Management
+---------------------------------------------------------------------
+
+FR-1: User Registration
+- Users must be able to register with email + password.
+- Email must be unique.
+
+FR-2: User Login/Logout
+- Secure login and logout.
+- MVP uses session-based authentication (cookies); JWT reserved for future API/mobile.
+
+FR-3: User Profile
+- Store basic user metadata (name, created_at).
+- Editable profile (optional in MVP).
+
+---------------------------------------------------------------------
+4.2 Onboarding Wizard (MANDATORY)
+---------------------------------------------------------------------
+
+FR-4: First-Time Access Control
+- New users must complete onboarding before accessing dashboard.
+
+FR-5: Domain Setup
+- User must define at least one domain.
+- System auto-creates default domains if skipped.
+
+FR-6: Goal Capture
+- Capture top 3 goals as free text.
+
+FR-7: First Project Creation
+- User must create at least one project.
+
+FR-8: First Tasks Creation
+- User must create at least 3 tasks.
+
+FR-9: Auto Defaults
+- If user provides no input, system creates:
+  Domains: Work, Personal, Learning
+  Project: Getting Started
+  Tasks:
+    - Review PCC dashboard
+    - Complete first focus task
+    - Do first weekly review
+- Partial input: fill only what is missing (e.g. user adds 1 domain → add remaining
+  default domains; user adds 2 tasks → add one default task to reach 3).
+
+---------------------------------------------------------------------
+4.3 Domain Management
+---------------------------------------------------------------------
+
+FR-10: Create Domain
+- User can create domains with name, objective, KPIs.
+
+FR-11: Edit/Delete Domain
+- Domains can be edited.
+- Deleting a domain: user must reassign projects to another domain or delete them.
+  Project/task deletion is hard delete (cascade); no soft-delete in MVP.
+
+---------------------------------------------------------------------
+4.4 Project Management
+---------------------------------------------------------------------
+
+FR-12: Create Project
+- Project must belong to a domain.
+- Fields: name, goal, deadline, priority, status.
+
+FR-13: Edit Project
+- All fields editable.
+
+FR-14: Project Status
+- Active, Paused, Completed.
+- Tasks under Paused projects remain in backlog but cannot be moved to focus until
+  project is Active again.
+
+FR-15: Project View
+- Show tasks, progress, overdue tasks.
+
+---------------------------------------------------------------------
+4.5 Task Management
+---------------------------------------------------------------------
+
+FR-16: Create Task
+- Task must belong to a project.
+- Fields: title, deadline, effort, energy level.
+- Effort: optional; scale T-shirt (XS, S, M, L, XL) or estimated hours (number).
+- Energy level: optional; Low / Medium / High (for planning when to do the task).
+
+FR-17: Task Status
+- Allowed statuses: backlog, focus, done, postponed.
+
+FR-18: Task Visibility
+- Task appears in:
+  - Project view
+  - Domain view
+  - Daily pool (if backlog/focus)
+
+FR-19: Task Editing
+- User can edit task details at any time.
+
+---------------------------------------------------------------------
+4.6 Daily Focus Engine (CORE REQUIREMENT)
+---------------------------------------------------------------------
+
+FR-20: Daily Focus Limit
+- User can have a maximum of 3 focus tasks per day.
+
+FR-21: Focus Assignment
+- Tasks moved from backlog to focus explicitly.
+
+FR-22: Enforcement
+- System must reject any attempt to exceed 3 focus tasks.
+
+FR-23: Slot Release
+- Completing or postponing a focus task frees a slot immediately.
+- Postpone: task returns to backlog. Same-day re-assignment to focus is allowed and
+  reuses the freed slot (no extra slot consumed).
+
+FR-24: Focus Date Tracking
+- Each focus task is associated with a focus_date (user's current date in their
+  timezone; store in UTC with user timezone or date-only in user TZ).
+
+---------------------------------------------------------------------
+4.7 Focus Mode & Focus Sessions
+---------------------------------------------------------------------
+
+FR-25: Focus Mode Timer
+- User can start a focus timer on a focus task.
+
+FR-26: Focus Session Logging
+- Starting timer creates FocusSession record.
+- Stopping timer records duration.
+
+FR-27: Multiple Sessions
+- Tasks can have multiple focus sessions.
+
+---------------------------------------------------------------------
+4.8 Review System
+---------------------------------------------------------------------
+
+FR-28: Daily Review Trigger
+- If user had >= 1 focus session today, daily review is required.
+- If skipped: persistent banner/block on dashboard until completed (MVP: block
+  access to main dashboard until review is submitted).
+
+FR-29: Daily Review Content
+- Show completed and missed focus tasks.
+- User must provide reason/comments.
+
+FR-30: Weekly Review Trigger
+- Weekly review required every 7 days (anchor: 7 days from last completed weekly
+  review, or from onboarding completion if none yet).
+- If skipped: same as daily (persistent prompt/block until completed).
+
+FR-31: Weekly Review Content
+- Project progress
+- Overdue tasks
+- Bottlenecks
+- Priority adjustment notes
+
+---------------------------------------------------------------------
+4.9 Analytics
+---------------------------------------------------------------------
+
+FR-32: Completion Rate
+- Show tasks completed over selected period.
+
+FR-33: Focus Time
+- Aggregate focus session durations.
+
+FR-34: Overdue Tasks
+- Count and list overdue tasks.
+
+FR-35: Domain Balance
+- Tasks completed per domain.
+
+=====================================================================
+SECTION 5 — NON-FUNCTIONAL REQUIREMENTS
+=====================================================================
+
+NFR-1: Performance
+- Dashboard must load under 2 seconds on average (measured on fast 3G, with up to
+  50 tasks in the account).
+
+NFR-2: Reliability
+- Focus sessions must not be lost on refresh/crash. Persist session on start/stop;
+  in-progress session state recoverable after refresh (resume or one-click save).
+
+NFR-3: Security
+- Passwords hashed (e.g. bcrypt). Auth-protected routes. Session timeout after
+  inactivity (e.g. 7 days). Rate limiting on login/register. All traffic over HTTPS.
+
+NFR-4: Scalability
+- Architecture must support future AI and vertical extensions.
+
+NFR-5: Usability
+- Minimal UI, low cognitive load, clear constraints.
+- Accessibility: core flows (auth, onboarding, focus, reviews) meet WCAG 2.1 Level A.
+
+=====================================================================
+SECTION 6 — DATA REQUIREMENTS
+=====================================================================
+
+- PostgreSQL database.
+- Strict referential integrity between users, domains, projects, tasks.
+- Server-side enforcement of business rules (especially focus limits).
+
+=====================================================================
+SECTION 7 — ACCEPTANCE CRITERIA
+=====================================================================
+
+AC-1:
+User cannot assign more than 3 focus tasks in a single day.
+
+AC-2:
+Focus session is created when timer starts and closed when stopped.
+
+AC-3:
+User is blocked from dashboard until onboarding is completed.
+
+AC-4:
+Daily review prompt appears if focus session exists.
+
+AC-5:
+Weekly review summarizes overdue tasks and project progress.
+
+---------------------------------------------------------------------
+7.1 Traceability (AC → FR)
+---------------------------------------------------------------------
+AC-1 → FR-20, FR-22
+AC-2 → FR-25, FR-26
+AC-3 → FR-4
+AC-4 → FR-28, FR-29
+AC-5 → FR-30, FR-31
+
+=====================================================================
+SECTION 8 — BUILD ORDER (AUTHORITATIVE)
+=====================================================================
+
+IMPORTANT:
+Components MUST be built in this order to avoid rework.
+
+PHASE 1 — FOUNDATION
+1. Project setup (Next.js, DB, auth)
+2. User model + authentication
+3. Core database schema (Users, Domains, Projects, Tasks)
+
+PHASE 2 — STRUCTURE
+4. Domain CRUD
+5. Project CRUD
+6. Task CRUD (backlog only)
+
+PHASE 3 — EXECUTION ENGINE (CRITICAL)
+7. Daily Focus logic (3-task hard limit, focus_date in user timezone)
+8. Task status transitions (backlog ↔ focus ↔ done/postponed)
+9. Server-side enforcement & error handling
+
+PHASE 4 — REALITY CAPTURE
+10. Focus Mode UI
+11. FocusSession logging (start/stop)
+12. Focus time aggregation
+
+PHASE 5 — REFLECTION
+13. Daily Review system
+14. Weekly Review system
+15. Priority adjustment logic
+
+PHASE 6 — VISIBILITY
+16. Dashboard widgets
+17. Analytics calculations
+18. Analytics UI
+
+PHASE 7 — POLISH
+19. Onboarding wizard + defaults
+20. Focus session recovery after refresh/crash (NFR-2)
+21. UX refinement
+22. Bug fixing & edge cases
+
+=====================================================================
+SECTION 9 — FUTURE EXTENSIONS (NOT MVP)
+=====================================================================
+
+- Knowledge management module
+- AI task decomposition
+- AI weekly insights
+- Monthly reviews
+- Vertical OS templates (Clinic, NGO, SME)
+- REST/API for integrations and verticals (platform-ready).
+- User data export (e.g. JSON/CSV for portability and compliance).
+
+=====================================================================
+SECTION 10 — ASSUMPTIONS & GLOSSARY
+=====================================================================
+
+10.1 Assumptions
+- Single timezone per user for MVP; no multi-timezone scheduling.
+- No offline support; web-only, online required.
+- One device per user for focus timer (no sync of in-progress session across devices in MVP).
+
+10.2 Glossary
+- Daily Focus Engine: The subsystem that enforces max 3 focus tasks per day and slot release.
+- Focus task: A task in status "focus" for a given focus_date.
+- Focus date: The calendar day (in user timezone) for which the task is in focus.
+- Slot: One of the three daily positions for a focus task; freed when task is done or postponed.
+- Domain: A life area (e.g. Work, Personal) containing projects and tasks.
+
+=====================================================================
+END OF REQUIREMENTS DOCUMENT

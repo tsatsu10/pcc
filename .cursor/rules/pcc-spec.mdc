@@ -1,0 +1,21 @@
+---
+description: PCC project spec and build order — use these docs as source of truth
+alwaysApply: true
+---
+
+# PCC Spec & Build Order
+
+When working on this project, treat these files as the **authoritative source**:
+
+1. **PCC_Full_Requirements_and_Build_Order.txt** — Full requirements (FR/NFR), acceptance criteria, and phased build order (7 phases).
+2. **PCC_Cursor_Build_Spec.txt** — MVP build spec: data model, API contract, UI screens, tech stack, repo structure, and practical build order.
+
+## Expectations
+
+- Follow the **build order** in the spec (auth + DB → onboarding → CRUD → Daily Focus engine → focus sessions → reviews → dashboard + analytics).
+- Enforce **Daily Focus Engine** rules: max 3 focus tasks per day; server-side enforcement; slot release on complete/postpone.
+- Use **PostgreSQL + Prisma**, **Next.js App Router**, **TypeScript**, **Tailwind**, **shadcn/ui** as specified.
+- Implement **mandatory onboarding** before dashboard access; support auto-defaults (domains, project, 3 tasks) when user skips.
+- When adding features or APIs, check the spec first and align with the data model and endpoint contracts defined there.
+
+Read the relevant sections of the two `.txt` files before implementing or changing PCC behavior.

@@ -1,0 +1,382 @@
+PERSONAL COMMAND CENTER (PCC) — CURSOR BUILD SPEC (SINGLE TXT)
+Version: 1.0
+Date: 2026-02-02
+Owner: Tsatsu
+
+============================================================
+0) GOAL
+Build the MVP of Personal Command Center (PCC): a web-based “Life Operating System” that enforces a strict daily focus constraint (max 3 active tasks) and provides projects, tasks, weekly review, and basic analytics.
+
+Non-negotiable: The Daily Focus Engine (3-task limit + focus sessions + reviews) must work perfectly.
+
+============================================================
+1) PRODUCT SUMMARY
+PCC is a unified cognitive operating system that structures life like a company:
+
+Mental Model:
+Life (User) → Domains (life departments) → Projects (structured goals) → Tasks (execution units) → Focus Sessions (reality) → Reviews (learning loop)
+
+Core Loop:
+Login → Daily Focus (max 3) → Focus Mode timer → complete/postpone → Daily/Weekly Review → next plan
+
+============================================================
+2) MVP SCOPE (PHASE 1)
+IN SCOPE (MVP):
+- Authentication: register, login, logout, profile basics
+- Mandatory onboarding wizard (first login only):
+  - Define domains (at least 1; default if skipped)
+  - Set top 3 goals (store as text)
+  - Add first project
+  - Add first 3 tasks
+- Main Dashboard:
+  - Overview widgets: today’s focus tasks, active projects, overdue tasks, review reminders
+- Domains module:
+  - CRUD domains (name, objective, KPIs)
+- Projects module:
+  - CRUD projects (name, domain, goal, deadline, priority, status)
+- Tasks module:
+  - CRUD tasks (title, deadline, effort, energy level, status)
+  - Task status transitions
+  - Task appears in Project + Domain views + Daily pool
+- Daily Focus Engine (core):
+  - Daily Focus view: select/confirm focus tasks (max 3)
+  - Block adding new focus tasks unless one is completed or postponed
+  - Focus Mode timer logs FocusSession
+- Reviews:
+  - Daily review (end-of-day prompt if any focus session exists)
+  - Weekly review (manual, end-of-week prompt)
+- Analytics (basic):
+  - Completion rate (tasks done / tasks created or tasks scheduled)
+  - Focus time totals (from focus sessions)
+  - Overdue tasks count
+  - Domain balance (tasks done per domain)
+
+OUT OF SCOPE (Phase 2+):
+- AI assistant (task breakdown, weekly insights)
+- Advanced knowledge graph/linking
+- Mobile app
+- Advanced analytics and forecasting
+
+============================================================
+3) USER FLOWS (AUTHORITATIVE)
+3.1 Master Navigation
+Landing → Sign Up/Login → Onboarding Wizard → Main Dashboard → modules:
+Domains | Projects | Tasks | Knowledge (later) | Reviews | Analytics
+
+3.2 Onboarding Wizard (cannot skip)
+1) Define Domains
+2) Set Top 3 Goals
+3) Add First Project
+4) Add First 3 Tasks
+5) Enter Main Dashboard
+
+System Logic:
+- If user stalls/skips, auto-create defaults:
+  - Domains: Work, Personal, Learning
+  - Project: Getting Started
+  - Tasks (3): Review dashboard; Complete first focus task; Do weekly review
+
+3.3 Daily Focus Flow (CORE)
+Dashboard → Daily Focus
+- System suggests top 3 tasks (heuristic: due soon + high priority + low effort)
+- User confirms/edits
+- Focus Mode starts timer
+- Complete task → mark done → progress updates
+Rules:
+- Max 3 active focus tasks per day
+- All others are backlog
+- Cannot add new focus tasks unless one is completed or postponed
+
+3.4 Domain Management
+Dashboard → Domains → Create/Edit → name/objective/KPIs → Save
+
+3.5 Project Creation
+Dashboard → Projects → Create → name/domain/goal/deadline/priority → Save → Project Page → Add Tasks
+
+3.6 Task Management
+Project Page → Add Task → title/deadline/effort/energy level → Save
+Task appears in Project, Domain, Daily pool
+
+3.7 Reviews
+Daily Review: list completed + missed focus tasks → user adds reasons → save
+Weekly Review: show project progress + bottlenecks + overdue tasks → adjust priorities → generate next week plan (simple: carry-over + top priorities)
+
+============================================================
+4) SYSTEM RULES (SERVER-SIDE ENFORCEMENT)
+4.1 Task Status
+Allowed statuses:
+- backlog
+- focus
+- done
+- postponed
+
+4.2 Daily Focus Constraints
+- At any time, per user, max 3 tasks with status='focus' for the active day.
+- If user tries to set a 4th focus task: reject with clear error.
+- User can add a focus task only if focus_count < 3.
+- To add a new focus task when focus_count == 3:
+  - must mark one as done OR postponed first.
+
+4.3 Focus Sessions
+- When user starts Focus Mode for a focus task: create FocusSession(start_time).
+- When user stops timer or marks task done: set end_time and duration_minutes.
+- A task can have multiple focus sessions.
+
+4.4 Reviews
+- If user has >= 1 FocusSession today: Daily Review becomes “required” (show prompt).
+- Weekly review: prompt on the 7th day after last weekly review (or every Sunday locally).
+
+============================================================
+5) DATA MODEL (POSTGRES)
+Use Prisma (recommended) or Drizzle. Postgres required.
+
+Tables:
+
+Users:
+- id (uuid, pk)
+- email (unique)
+- password_hash
+- name (nullable)
+- created_at
+- updated_at
+
+Domains:
+- id (uuid, pk)
+- user_id (fk Users)
+- name
+- objective (text, nullable)
+- kpis (jsonb, nullable)
+- created_at
+- updated_at
+
+Projects:
+- id (uuid, pk)
+- user_id (fk Users)  // keep direct for speed; also domain_id
+- domain_id (fk Domains)
+- name
+- goal (text, nullable)
+- deadline (date, nullable)
+- priority (int: 1=low,2=med,3=high)
+- status (enum: active, paused, completed)
+- created_at
+- updated_at
+
+Tasks:
+- id (uuid, pk)
+- user_id (fk Users)
+- project_id (fk Projects)
+- title
+- deadline (date, nullable)
+- effort (enum: xs,s,m,l,xl OR integer minutes)
+- energy_level (enum: low,medium,high)
+- status (enum: backlog, focus, done, postponed)
+- focus_date (date, nullable) // date this was placed into focus
+- created_at
+- updated_at
+
+FocusSessions:
+- id (uuid, pk)
+- user_id (fk Users)
+- task_id (fk Tasks)
+- start_time (timestamp)
+- end_time (timestamp, nullable)
+- duration_minutes (int, nullable)
+- created_at
+
+Reviews:
+- id (uuid, pk)
+- user_id (fk Users)
+- type (enum: daily, weekly)
+- period_start (date) // for daily: that date; weekly: week start date
+- period_end (date)
+- content (jsonb) // reasons, bottlenecks, notes
+- created_at
+
+Indexes:
+- Tasks(user_id, status)
+- Tasks(user_id, focus_date)
+- Projects(user_id, domain_id)
+- FocusSessions(user_id, start_time)
+
+============================================================
+6) API CONTRACT (NEXT.JS ROUTE HANDLERS)
+Use Next.js App Router with route handlers or NestJS API (MVP: Next route handlers).
+Auth via NextAuth or custom JWT sessions.
+
+Endpoints (REST):
+Auth:
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/logout
+- GET  /api/me
+
+Domains:
+- GET  /api/domains
+- POST /api/domains
+- PATCH/DELETE /api/domains/:id
+
+Projects:
+- GET  /api/projects
+- POST /api/projects
+- GET  /api/projects/:id
+- PATCH/DELETE /api/projects/:id
+
+Tasks:
+- GET  /api/tasks?projectId=&domainId=&status=
+- POST /api/tasks
+- PATCH /api/tasks/:id        // edit fields
+- PATCH /api/tasks/:id/status // status transition; enforce focus limit
+- DELETE /api/tasks/:id
+Daily Focus:
+- GET  /api/focus/today
+- POST /api/focus/assign      // set task status=focus & focus_date=today (enforce limit)
+- POST /api/focus/postpone    // set status=postponed
+Focus Sessions:
+- POST /api/focus-sessions/start (task_id)
+- POST /api/focus-sessions/stop  (session_id)
+Reviews:
+- POST /api/reviews/daily
+- POST /api/reviews/weekly
+Analytics:
+- GET /api/analytics?range=7d|30d|90d
+
+============================================================
+7) UI SCREENS (MVP)
+Use Next.js + Tailwind + shadcn/ui.
+
+7.1 Landing
+- product summary + CTA to sign up
+
+7.2 Auth
+- register/login
+
+7.3 Onboarding Wizard (steps)
+- stepper UI
+- create domains
+- top 3 goals (text)
+- first project
+- first 3 tasks
+
+7.4 Main Dashboard
+Widgets:
+- Today Focus (3 slots)
+- Active Projects
+- Overdue Tasks
+- Review Reminder (daily/weekly)
+- Quick add task (adds to backlog only)
+
+7.5 Daily Focus View
+- suggested tasks list (from backlog)
+- focus slots (3)
+- start focus session button per task
+- show timer in Focus Mode
+
+7.6 Focus Mode
+- big timer
+- pause/stop
+- notes (optional)
+- end session → mark done/postpone/continue
+
+7.7 Domains
+- list + create/edit modal
+- domain detail: objective, KPIs, projects summary
+
+7.8 Projects
+- list + filters
+- project detail: tasks list + add task
+
+7.9 Tasks
+- all tasks view with filters
+- edit task drawer/modal
+
+7.10 Reviews
+- daily review form: completed, missed + reasons
+- weekly review: progress, bottlenecks, priority adjustment
+
+7.11 Analytics
+- charts: completion rate, focus minutes, overdue count, domain distribution
+
+============================================================
+8) SUGGESTION HEURISTICS (MVP)
+Daily Focus “suggest top 3” heuristic:
+score(task) =
+  + 3 if deadline <= 2 days
+  + 2 if priority high
+  + 1 if effort small/medium
+  + 1 if energy matches user preference (optional)
+Sort by score desc; pick top 3 backlog tasks.
+
+(Keep it simple; AI later.)
+
+============================================================
+9) TECH STACK (RECOMMENDED)
+Frontend: Next.js (App Router), TypeScript, Tailwind, shadcn/ui
+Backend: Next.js Route Handlers (MVP) OR NestJS (later)
+DB: PostgreSQL + Prisma
+Auth: NextAuth or custom JWT + httpOnly cookies
+Hosting: Vercel (frontend) + Supabase/Railway (Postgres)
+
+============================================================
+10) REPO STRUCTURE (SUGGESTED)
+pcc/
+  app/
+    (auth)/
+    onboarding/
+    dashboard/
+    domains/
+    projects/
+    tasks/
+    focus/
+    reviews/
+    analytics/
+    api/
+  components/
+  lib/
+    db/
+    auth/
+    rules/ (daily focus enforcement)
+  prisma/
+  tests/
+
+============================================================
+11) ACCEPTANCE CRITERIA (MVP DEFINITION OF DONE)
+A) Onboarding
+- New user must complete onboarding before accessing dashboard.
+- System creates defaults if user provides nothing and continues.
+
+B) Daily Focus Enforcement
+- User cannot have more than 3 focus tasks for today.
+- Attempting to assign a 4th returns a server error + UI message.
+- Completing or postponing a focus task frees a slot immediately.
+
+C) Focus Sessions
+- Starting a timer creates a FocusSession.
+- Stopping timer sets end_time and duration.
+- Task can show total focus time.
+
+D) Reviews
+- If user had a focus session today, daily review prompt appears.
+- Weekly review screen shows overdue tasks and project progress.
+
+E) Analytics
+- Shows completion rate, focus minutes, overdue count, domain distribution for selected range.
+
+============================================================
+12) PHASE 2 (NOT MVP, ROADMAP)
+- Knowledge module: notes, tags, search, link to domain/project
+- AI assistant: task breakdown, review summaries, bottleneck identification
+- Advanced analytics: trends, forecasting, capacity planning
+- Vertical OS templates (clinic/NGO/SME)
+
+============================================================
+13) BUILD ORDER (PRACTICAL)
+1) Auth + DB models
+2) Onboarding wizard + defaults
+3) Projects + tasks CRUD
+4) Daily Focus engine (hard limit)
+5) Focus sessions (timer)
+6) Daily/weekly reviews
+7) Dashboard + analytics
+
+============================================================
+END OF SPEC
